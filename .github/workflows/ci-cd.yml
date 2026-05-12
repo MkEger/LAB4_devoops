@@ -51,7 +51,7 @@ jobs:
       - name: 🧪 Frontend Build
         run: |
           cd src/MapClient
-          npm ci
+          npm install
           npm run build
         continue-on-error: true
 
@@ -107,7 +107,7 @@ jobs:
       - name: 🔨 Build Frontend
         run: |
           cd src/MapClient
-          npm ci
+          npm install
           npm run build
 
   # ════════════════════════════════════════════════════════════
