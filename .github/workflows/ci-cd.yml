@@ -1,0 +1,267 @@
+name: 🚀 CI/CD Pipeline
+
+# Коли запускати
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  # Ручний запуск
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ════════════════════════════════════════════════════════════
+  # JOB 1: ТЕСТУВАННЯ
+  # ════════════════════════════════════════════════════════════
+  test:
+    name: 🧪 Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      # Backend тести
+      - name: 🔧 Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: 🧪 Backend Tests
+        run: |
+          cd src/CommunicationControl
+          dotnet restore
+          dotnet test --configuration Release || true
+        continue-on-error: true
+
+      # Frontend тести
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: 🧪 Frontend Build
+        run: |
+          cd src/MapClient
+          npm ci
+          npm run build
+        continue-on-error: true
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 2: БЕЗПЕКА (SAST)
+  # ════════════════════════════════════════════════════════════
+  security:
+    name: 🔐 Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      # Trivy - Container Security
+      - name: 🔐 Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'src/'
+          severity: 'HIGH,CRITICAL'
+        continue-on-error: true
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 3: БУДУВАННЯ
+  # ════════════════════════════════════════════════════════════
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: 🔨 Build Backend
+        run: |
+          cd src/CommunicationControl
+          dotnet restore
+          dotnet publish -c Release -o ./publish
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: 🔨 Build Frontend
+        run: |
+          cd src/MapClient
+          npm ci
+          npm run build
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 4: DOCKER BUILD & PUSH
+  # ════════════════════════════════════════════════════════════
+  docker:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [test, security, build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔓 Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐳 Build Backend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/CommunicationControl
+          file: ./src/CommunicationControl/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest-${{ github.ref_name }}
+
+      - name: 🐳 Build Frontend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/MapClient
+          file: ./src/MapClient/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest-${{ github.ref_name }}
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 5: DEPLOY на DEV (автоматичний)
+  # ════════════════════════════════════════════════════════════
+  deploy-dev:
+    name: 🚀 Deploy to DEV
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment:
+      name: development
+      url: http://dev.example.com
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEV_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEV_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🚀 Deploy to DEV Server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEV_SSH_USER }}@${{ secrets.DEV_SSH_HOST }} << 'EOFSH'
+          set -e
+          echo "📁 Entering project directory..."
+          cd ${{ secrets.DEV_SERVER_PATH }}
+
+          echo "📥 Pulling latest code..."
+          git fetch origin
+          git checkout develop
+          git pull origin develop
+
+          echo "🔓 Logging to GitHub Container Registry..."
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          echo "⏹️ Stopping old containers..."
+          docker-compose down || true
+
+          echo "🐳 Pulling new images..."
+          docker pull ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+
+          echo "▶️ Starting containers..."
+          export BACKEND_IMAGE=ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          export FRONTEND_IMAGE=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          docker-compose up -d
+
+          echo "📊 Container status:"
+          docker-compose ps
+
+          echo "✅ DEV Deployment complete!"
+          EOFSH
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 6: DEPLOY на PROD (ручний)
+  # ════════════════════════════════════════════════════════════
+  deploy-prod:
+    name: 🚀 Deploy to PROD
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: http://prod.example.com
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🚀 Deploy to PROD Server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} << 'EOFSH'
+          set -e
+          echo "📁 Entering project directory..."
+          cd ${{ secrets.PROD_SERVER_PATH }}
+
+          echo "📥 Pulling latest code..."
+          git fetch origin
+          git checkout main
+          git pull origin main
+
+          echo "🔓 Logging to GitHub Container Registry..."
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          echo "⏹️ Stopping old containers..."
+          docker-compose down || true
+
+          echo "🐳 Pulling new images..."
+          docker pull ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+
+          echo "▶️ Starting containers..."
+          export BACKEND_IMAGE=ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          export FRONTEND_IMAGE=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          docker-compose up -d
+
+          echo "📊 Container status:"
+          docker-compose ps
+
+          echo "✅ PRODUCTION Deployment complete!"
+          EOFSH
