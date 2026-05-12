@@ -134,6 +134,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 🔤 Set lowercase image name
+        id: image
+        run: echo "name=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: 🐳 Build Backend Image
         uses: docker/build-push-action@v4
         with:
@@ -141,8 +145,8 @@ jobs:
           file: ./src/CommunicationControl/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest-${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}/backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}/backend:latest-${{ github.ref_name }}
 
       - name: 🐳 Build Frontend Image
         uses: docker/build-push-action@v4
@@ -151,8 +155,8 @@ jobs:
           file: ./src/MapClient/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest-${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}/frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}/frontend:latest-${{ github.ref_name }}
 
   # ════════════════════════════════════════════════════════════
   # JOB 5: DEPLOY на DEV (автоматичний)
@@ -196,12 +200,12 @@ jobs:
           docker-compose down || true
 
           echo "🐳 Pulling new images..."
-          docker pull ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-          docker pull ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
 
           echo "▶️ Starting containers..."
-          export BACKEND_IMAGE=ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-          export FRONTEND_IMAGE=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+          export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
           docker-compose up -d
 
           echo "📊 Container status:"
@@ -252,12 +256,12 @@ jobs:
           docker-compose down || true
 
           echo "🐳 Pulling new images..."
-          docker pull ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-          docker pull ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
 
           echo "▶️ Starting containers..."
-          export BACKEND_IMAGE=ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-          export FRONTEND_IMAGE=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+          export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+          export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
           docker-compose up -d
 
           echo "📊 Container status:"
