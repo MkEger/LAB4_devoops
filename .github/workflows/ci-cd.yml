@@ -174,45 +174,41 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v3
 
-      - name: 🔧 Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEV_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.DEV_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
       - name: 🚀 Deploy to DEV Server
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.DEV_SSH_USER }}@${{ secrets.DEV_SSH_HOST }} << 'EOFSH'
-          set -e
-          echo "📁 Entering project directory..."
-          cd ${{ secrets.DEV_SERVER_PATH }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            set -e
+            echo "📁 Entering project directory..."
+            cd ${{ secrets.DEV_SERVER_PATH }}
 
-          echo "📥 Pulling latest code..."
-          git fetch origin
-          git checkout develop
-          git pull origin develop
+            echo "📥 Pulling latest code..."
+            git fetch origin
+            git checkout develop
+            git pull origin develop
 
-          echo "🔓 Logging to GitHub Container Registry..."
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "🔓 Logging to GitHub Container Registry..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-          echo "⏹️ Stopping old containers..."
-          docker-compose down || true
+            echo "⏹️ Stopping old containers..."
+            docker-compose down || true
 
-          echo "🐳 Pulling new images..."
-          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            echo "🐳 Pulling new images..."
+            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
 
-          echo "▶️ Starting containers..."
-          export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-          export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
-          docker-compose up -d
+            echo "▶️ Starting containers..."
+            export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+            export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            docker-compose up -d
 
-          echo "📊 Container status:"
-          docker-compose ps
+            echo "📊 Container status:"
+            docker-compose ps
 
-          echo "✅ DEV Deployment complete!"
-          EOFSH
+            echo "✅ DEV Deployment complete!"
 
   # ════════════════════════════════════════════════════════════
   # JOB 6: DEPLOY на PROD (ручний)
@@ -230,42 +226,38 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v3
 
-      - name: 🔧 Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
       - name: 🚀 Deploy to PROD Server
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} << 'EOFSH'
-          set -e
-          echo "📁 Entering project directory..."
-          cd ${{ secrets.PROD_SERVER_PATH }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            echo "📁 Entering project directory..."
+            cd ${{ secrets.PROD_SERVER_PATH }}
 
-          echo "📥 Pulling latest code..."
-          git fetch origin
-          git checkout main
-          git pull origin main
+            echo "📥 Pulling latest code..."
+            git fetch origin
+            git checkout main
+            git pull origin main
 
-          echo "🔓 Logging to GitHub Container Registry..."
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "🔓 Logging to GitHub Container Registry..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-          echo "⏹️ Stopping old containers..."
-          docker-compose down || true
+            echo "⏹️ Stopping old containers..."
+            docker-compose down || true
 
-          echo "🐳 Pulling new images..."
-          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-          docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            echo "🐳 Pulling new images..."
+            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
 
-          echo "▶️ Starting containers..."
-          export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-          export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
-          docker-compose up -d
+            echo "▶️ Starting containers..."
+            export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
+            export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            docker-compose up -d
 
-          echo "📊 Container status:"
-          docker-compose ps
+            echo "📊 Container status:"
+            docker-compose ps
 
-          echo "✅ PRODUCTION Deployment complete!"
-          EOFSH
+            echo "✅ PRODUCTION Deployment complete!"
