@@ -201,12 +201,13 @@ jobs:
             docker-compose down || true
 
             echo "🐳 Pulling new images..."
-            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            IMAGE_NAME=$(echo "ghcr.io/mkeger/lab4_devoops" | tr '[:upper:]' '[:lower:]')
+            docker pull ${IMAGE_NAME}/backend:${{ github.sha }}
+            docker pull ${IMAGE_NAME}/frontend:${{ github.sha }}
 
             echo "▶️ Starting containers..."
-            export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-            export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            export BACKEND_IMAGE=${IMAGE_NAME}/backend:${{ github.sha }}
+            export FRONTEND_IMAGE=${IMAGE_NAME}/frontend:${{ github.sha }}
             docker-compose up -d
 
             echo "📊 Container status:"
@@ -253,12 +254,13 @@ jobs:
             docker-compose down || true
 
             echo "🐳 Pulling new images..."
-            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-            docker pull ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            IMAGE_NAME=$(echo "ghcr.io/mkeger/lab4_devoops" | tr '[:upper:]' '[:lower:]')
+            docker pull ${IMAGE_NAME}/backend:${{ github.sha }}
+            docker pull ${IMAGE_NAME}/frontend:${{ github.sha }}
 
             echo "▶️ Starting containers..."
-            export BACKEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/backend:${{ github.sha }}
-            export FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/lab4_devoops/frontend:${{ github.sha }}
+            export BACKEND_IMAGE=${IMAGE_NAME}/backend:${{ github.sha }}
+            export FRONTEND_IMAGE=${IMAGE_NAME}/frontend:${{ github.sha }}
             docker-compose up -d
 
             echo "📊 Container status:"
