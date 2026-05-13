@@ -172,7 +172,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     environment:
       name: development
-      url: http://dev.example.com
+      url: http://32.192.198.95
 
     steps:
       - name: 📥 Checkout code
