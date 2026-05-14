@@ -21,7 +21,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy config.json from public folder
-COPY src/MapClient/public/config.json /usr/share/nginx/html/config.json
+COPY public/config.json /usr/share/nginx/html/config.json
 
 EXPOSE 80
 
